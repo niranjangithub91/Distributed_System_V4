@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package user;
+option go_package = "../userpb";
+service FileUploadService {
+  rpc Upload(stream UploadRequest) returns (UploadResponse);
+  rpc Heartbeat(Send_Heart_beat_Request)returns(Reply_Heart_beat);
+}
+
+message UploadRequest {
+  string filename = 1;
+  bytes chunk = 2;
+  int64 chunk_part=3;
+  string Username=4;
+}
+
+message UploadResponse {
+  string message = 1;
+  int64 total_bytes = 2;
+}
+
+message Send_Heart_beat_Request{
+  string msg=1;
+}
+message Reply_Heart_beat{
+  bool status=1;
+}
