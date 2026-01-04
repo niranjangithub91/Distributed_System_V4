@@ -5,6 +5,7 @@ option go_package = "../userpb";
 service FileUploadService {
   rpc Upload(stream UploadRequest) returns (UploadResponse);
   rpc Heartbeat(Send_Heart_beat_Request)returns(Reply_Heart_beat);
+  rpc Download(DownloadRequest)returns(stream DownloadResponse);
 }
 
 message UploadRequest {
@@ -13,7 +14,6 @@ message UploadRequest {
   int64 chunk_part=3;
   string Username=4;
 }
-
 message UploadResponse {
   string message = 1;
   int64 total_bytes = 2;
@@ -24,4 +24,14 @@ message Send_Heart_beat_Request{
 }
 message Reply_Heart_beat{
   bool status=1;
+}
+
+message DownloadRequest{
+  string name=1;
+  string filename=2;
+  int64 chunk_number=3;
+}
+message DownloadResponse{
+  string filemane=1;
+  bytes chunk=2;
 }

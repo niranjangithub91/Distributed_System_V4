@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strconv"
 	"sync"
+	"time"
 	"user/userpb"
 
 	"google.golang.org/grpc"
@@ -81,4 +83,66 @@ func Send_file(port string, shard []byte, filename string, part int, name string
 	fmt.Println(resp.Message)
 	fmt.Println(resp.TotalBytes)
 	return nil
+}
+
+func Receive_file_init(filename string, name string, loc_detail map[string]string) [][]byte {
+	var wg sync.WaitGroup
+	var mt sync.Mutex
+	shards := make([][]byte, 5)
+	for key, value := range loc_detail {
+		num, err := strconv.Atoi(key)
+		if err != nil {
+			continue
+		}
+		port := value
+		wg.Add(1)
+		go func(wg *sync.WaitGroup, mt *sync.Mutex, port string, filename string, name string, num int) {
+			defer wg.Done()
+			shard := Receive_file(port, num, filename, name)
+			mt.Lock()
+			shards[num] = shard
+			mt.Unlock()
+		}(&wg, &mt, port, filename, name, num)
+	}
+	wg.Wait()
+	return shards
+}
+
+func Receive_file(port string, chunknum int, filename string, name string) []byte {
+	var shards []byte
+	host := fmt.Sprintf("localhost:%s", port)
+	conn, err := grpc.Dial(host, grpc.WithInsecure())
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+	defer conn.Close()
+	client := userpb.NewFileUploadServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	stream, err := client.Download(ctx, &userpb.DownloadRequest{
+		Name:        name,
+		Filename:    filename,
+		ChunkNumber: int64(chunknum),
+	})
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break // download complete
+		}
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
+		shard := resp.Chunk
+		shards = append(shards, shard...)
+	}
+	for i := 0; i < len(shards); i++ {
+		fmt.Println(shards[i])
+	}
+	return shards
 }

@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	FileUploadService_Upload_FullMethodName    = "/user.FileUploadService/Upload"
 	FileUploadService_Heartbeat_FullMethodName = "/user.FileUploadService/Heartbeat"
+	FileUploadService_Download_FullMethodName  = "/user.FileUploadService/Download"
 )
 
 // FileUploadServiceClient is the client API for FileUploadService service.
@@ -29,6 +30,7 @@ const (
 type FileUploadServiceClient interface {
 	Upload(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadRequest, UploadResponse], error)
 	Heartbeat(ctx context.Context, in *Send_HeartBeat_Request, opts ...grpc.CallOption) (*Reply_HeartBeat, error)
+	Download(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadResponse], error)
 }
 
 type fileUploadServiceClient struct {
@@ -62,12 +64,32 @@ func (c *fileUploadServiceClient) Heartbeat(ctx context.Context, in *Send_HeartB
 	return out, nil
 }
 
+func (c *fileUploadServiceClient) Download(ctx context.Context, in *DownloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &FileUploadService_ServiceDesc.Streams[1], FileUploadService_Download_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DownloadRequest, DownloadResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type FileUploadService_DownloadClient = grpc.ServerStreamingClient[DownloadResponse]
+
 // FileUploadServiceServer is the server API for FileUploadService service.
 // All implementations must embed UnimplementedFileUploadServiceServer
 // for forward compatibility.
 type FileUploadServiceServer interface {
 	Upload(grpc.ClientStreamingServer[UploadRequest, UploadResponse]) error
 	Heartbeat(context.Context, *Send_HeartBeat_Request) (*Reply_HeartBeat, error)
+	Download(*DownloadRequest, grpc.ServerStreamingServer[DownloadResponse]) error
 	mustEmbedUnimplementedFileUploadServiceServer()
 }
 
@@ -83,6 +105,9 @@ func (UnimplementedFileUploadServiceServer) Upload(grpc.ClientStreamingServer[Up
 }
 func (UnimplementedFileUploadServiceServer) Heartbeat(context.Context, *Send_HeartBeat_Request) (*Reply_HeartBeat, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
+}
+func (UnimplementedFileUploadServiceServer) Download(*DownloadRequest, grpc.ServerStreamingServer[DownloadResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method Download not implemented")
 }
 func (UnimplementedFileUploadServiceServer) mustEmbedUnimplementedFileUploadServiceServer() {}
 func (UnimplementedFileUploadServiceServer) testEmbeddedByValue()                           {}
@@ -130,6 +155,17 @@ func _FileUploadService_Heartbeat_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FileUploadService_Download_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(FileUploadServiceServer).Download(m, &grpc.GenericServerStream[DownloadRequest, DownloadResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type FileUploadService_DownloadServer = grpc.ServerStreamingServer[DownloadResponse]
+
 // FileUploadService_ServiceDesc is the grpc.ServiceDesc for FileUploadService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -147,6 +183,11 @@ var FileUploadService_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "Upload",
 			Handler:       _FileUploadService_Upload_Handler,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "Download",
+			Handler:       _FileUploadService_Download_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "user.proto",

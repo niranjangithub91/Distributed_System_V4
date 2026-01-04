@@ -24,3 +24,13 @@ func Save_Chunk(data []byte, filename string, chunk_part int, username string) {
 
 	return
 }
+
+func Get_Chunk(name string, filename string, chunknum int) []byte {
+	filepath := fmt.Sprintf("./chunks/%s/%s/chunk_%d_%s", name, filename, chunknum, filename)
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return data
+}
