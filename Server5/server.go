@@ -46,6 +46,32 @@ func (s *FileUploadServer) Heartbeat(context.Context, *userpb.Send_HeartBeat_Req
 	}, nil
 
 }
+func (s *FileUploadServer) Download(req *userpb.DownloadRequest, stream userpb.FileUploadService_DownloadServer) error {
+	fmt.Println("Hi")
+
+	chunkSize := 16 * 1024
+	name := req.Name
+	file_name := req.Filename
+	chunknum := req.ChunkNumber
+	shard := file_management.Get_Chunk(name, file_name, int(chunknum))
+	for offset := 0; offset < len(shard); offset += chunkSize {
+		end := offset + chunkSize
+		if end > len(shard) {
+			end = len(shard)
+		}
+		reply := &userpb.DownloadResponse{
+			Filemane: file_name,
+			Chunk:    shard[offset:end],
+		}
+		err := stream.Send(reply)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
 func main() {
 	listener, err := net.Listen("tcp", "0.0.0.0:3005")
 	if err != nil {

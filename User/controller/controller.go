@@ -140,5 +140,39 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func Download(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Download function is invoked")
+	claims, _ := r.Context().Value("claims").(*model.Claims)
+	name := claims.Data
+	var data map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&data)
+	if err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	filename := data["filename"].(string)
+	metadata := db.Get_Metadata(name, filename)
+	location_datail := metadata.Chunk_location_details
+	var formated_loc_details map[string]string
+	json.Unmarshal(location_datail, &formated_loc_details)
+	shards := filesystemmanagement.Receive_file_init(filename, name, formated_loc_details)
+	enc, err := reedsolomon.New(3, 2)
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+	err = enc.Reconstruct(shards)
+	if err != nil {
+		http.Error(w, "Reconstruction failed", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	response := map[string]interface{}{
+		"message":  "File reconstructed successfully",
+		"filename": filename,
+	}
+
+	json.NewEncoder(w).Encode(response)
 	return
 }

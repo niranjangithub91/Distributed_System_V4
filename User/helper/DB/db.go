@@ -82,6 +82,16 @@ func Add_Metadata(data []string, username string, filename string) bool {
 	return true
 }
 
+func Get_Metadata(username string, filename string) model.Metadata {
+	var data []model.Metadata
+	var data1 model.Metadata
+	DB.Where("name=? AND filename=? ", username, filename).First(&data)
+	if len(data) > 0 {
+		data1 = data[0]
+	}
+	return data1
+}
+
 func modify_data(data []string) map[string]string {
 	data1 := make(map[string]string)
 	for i := 0; i < len(data); i++ {
